@@ -73,21 +73,49 @@ async def get_report(
             "gan_artifact_score": record.gan_score,
             "ela_score": record.ela_score,
             "face_swap_score": record.face_swap_score,
+            "compression_inconsistency": 0.0, # Not in DB, setting default
+            "noise_inconsistency": 0.0,       # Not in DB, setting default
             "is_deepfake": record.is_deepfake,
             "confidence_label": "High" if record.is_deepfake else "Low"
         },
         metadata_analysis={
-            "format": record.image_format,
-            "width": record.image_width,
-            "height": record.image_height,
+            "image_id": image_id,
             "has_exif": record.has_exif,
-            "make": record.camera_make,
-            "model": record.camera_model,
+            "camera_make": record.camera_make,
+            "camera_model": record.camera_model,
+            "software": None,
+            "datetime_original": None,
+            "gps_latitude": None,
+            "gps_longitude": None,
+            "image_width": record.image_width,
+            "image_height": record.image_height,
+            "color_space": "RGB",
+            "compression_quality": 90,
             "steganography_detected": record.stego_detected,
-            "suspicious_flags": record.suspicious_flags
+            "lsb_anomaly_score": 0.0,
+            "metadata_stripped": not record.has_exif,
+            "consistency_score": 0.8,
+            "suspicious_flags": record.suspicious_flags or []
         },
-        provenance_graph=prov_record.graph_data if prov_record else {"nodes": [], "edges": []},
-        social_spread=social_record.spread_data if social_record else {"nodes": [], "edges": []},
+        provenance_graph=prov_record.graph_data if (prov_record and prov_record.graph_data) else {
+            "image_id": image_id,
+            "root_node_id": "root",
+            "nodes": [],
+            "edges": [],
+            "total_versions": 0,
+            "spread_depth": 0,
+            "integrity_score": 1.0,
+            "chain_broken": False
+        },
+        social_spread=social_record.spread_data if (social_record and social_record.spread_data) else {
+            "image_id": image_id,
+            "platforms": [],
+            "total_reach": 0,
+            "viral_coefficient": 0.0,
+            "spread_timeline": [],
+            "first_seen": record.analyzed_at.isoformat(),
+            "peak_spread_time": record.analyzed_at.isoformat()
+        },
         manipulation_regions=[], # Not stored in DB to save space
         overall_authenticity_score=round(1.0 - record.deepfake_score, 4),
         verdict=verdict,

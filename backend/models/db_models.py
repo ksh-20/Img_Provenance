@@ -38,6 +38,7 @@ class AnalysisRecord(Base):
     image_width      = Column(Integer, nullable=True)
     image_height     = Column(Integer, nullable=True)
     image_format     = Column(String(16), nullable=True)
+    phash            = Column(String(64), nullable=True)
 
     # deepfake results
     verdict          = Column(String(32), nullable=True)  # AUTHENTIC | SUSPICIOUS | DEEPFAKE | MANIPULATED

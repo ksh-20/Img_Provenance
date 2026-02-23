@@ -15,7 +15,7 @@ from models.schemas import (
 from services.deepfake import analyze_image
 from services.metadata import extract_metadata
 from services.hashing import compute_hashes
-from services.forensics import perform_ela, detect_manipulation_regions
+from services.forensics import perform_ela, detect_manipulation_regions, compute_verdict
 from services.auth_service import get_current_user
 
 router = APIRouter(prefix="/api/images", tags=["Image Analysis"])
@@ -64,6 +64,7 @@ async def upload_image(
         image_width=width,
         image_height=height,
         image_format=fmt,
+        phash=hashes["phash"],
         analyzed_at=upload_time # Placeholder until full analysis
     )
     db.add(record)
@@ -130,8 +131,8 @@ async def analyze(
     record.is_deepfake     = deepfake_score.is_deepfake
     
     record.has_exif         = metadata.has_exif
-    record.camera_make      = metadata.make
-    record.camera_model     = metadata.model
+    record.camera_make      = metadata.camera_make
+    record.camera_model     = metadata.camera_model
     record.stego_detected   = metadata.steganography_detected
     record.suspicious_flags = metadata.suspicious_flags
     record.analyzed_at      = datetime.utcnow()

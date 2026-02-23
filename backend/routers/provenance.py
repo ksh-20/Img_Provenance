@@ -28,7 +28,7 @@ async def get_provenance_graph(
         "image_id": image_id,
         "filename": record.filename,
         "upload_time": record.analyzed_at.isoformat(),
-        "phash": "0" * 16, # Placeholder, hashes not in AnalysisRecord yet
+        "phash": record.phash,
         "deepfake_score": record.deepfake_score,
     }
 

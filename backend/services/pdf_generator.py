@@ -98,8 +98,8 @@ def generate_forensics_pdf(report_data: dict, output_path: str):
     meta = report_data.get("metadata_analysis", {})
     meta_data = [
         ["Format:", meta.get("format", "Unknown")],
-        ["Dimensions:", f"{meta.get('width', 0)} x {meta.get('height', 0)}"],
-        ["Camera Make:", meta.get("make", "N/A")],
+        ["Dimensions:", f"{meta.get('image_width', 0)} x {meta.get('image_height', 0)}"],
+        ["Camera Make:", meta.get("camera_make", "N/A")],
         ["Steganography:", "DETECTED" if meta.get("steganography_detected") else "None Found"]
     ]
     mt = Table(meta_data, colWidths=[1.5*inch, 4*inch])
