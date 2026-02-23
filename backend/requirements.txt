@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+Pillow
+imagehash
+networkx
+numpy
+scipy
+scikit-learn
+pydantic
+aiofiles
+httpx
+python-dotenv
