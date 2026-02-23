@@ -15,10 +15,11 @@ FakeLineage is a full-stack research platform that traces the origin and spread 
 | 🔍 **ELA Heatmaps**             | Error Level Analysis heatmap with thermal colour mapping               |
 | 📡 **Social Spread Simulation** | Viral propagation simulation across Twitter, Instagram, TikTok, Reddit |
 | 🔐 **Steganography Scan**       | LSB (Least Significant Bit) anomaly detection for hidden data          |
-| 📋 **Forensics Report**         | Chain-of-custody report with JSON export                               |
-| 🛡 **JWT Authentication**       | Secure register/login flow with bcrypt passwords                       |
-| 🗄 **MySQL Persistence**        | All analyses, provenance graphs, and social spreads stored per user    |
+| 📋 **Forensics Report**         | Comprehensive report with PDF/JSON export + centralized verdict logic  |
+| 🛡 **JWT Authentication**       | Secure register/login flow with persistent user preferences sync       |
+| 🗄 **MySQL Persistence**        | Analyses, provenance, social spreads, and settings stored per user     |
 | 📦 **Batch Analysis**           | Queue multiple images for parallel forensic processing                 |
+| 🧹 **Auto-Cleanup**             | Background service that purged temporary files every 30 mins           |
 
 ---
 
@@ -46,14 +47,17 @@ Image Provenance/
 │       ├── hashing.py          # pHash, dHash, aHash similarity
 │       ├── metadata.py         # EXIF extraction, GPS parsing, steganography
 │       ├── graph.py            # Provenance graph construction (NetworkX)
-│       └── social.py           # Social spread simulation
+│       ├── social.py           # Social spread simulation
+│       ├── cleanup.py          # Background task: auto-delete old uploads/reports
+│       └── pdf_generator.py    # Forensic report PDF generation
 │
 └── frontend/                   # React + TypeScript + Tailwind CSS
     └── src/
         ├── api/client.ts       # Axios instance + auth interceptors + typed API calls
         ├── store/
         │   ├── appStore.ts     # Zustand app-level state (analysis session)
-        │   └── authStore.ts    # Zustand auth state (token, user) persisted to localStorage
+        │   ├── authStore.ts    # Zustand auth state (token, user)
+        │   └── settingsStore.ts # Zustand settings (thresholds, config) persisted & synced
         ├── components/
         │   ├── Auth/           # ProtectedRoute
         │   ├── Layout/         # Sidebar (user info + logout), Layout (Outlet)
@@ -162,12 +166,13 @@ All protected routes ──→ Axios interceptor injects "Authorization: Bearer 
 
 **Endpoints:**
 
-| Method | Endpoint             | Description                                |
-| ------ | -------------------- | ------------------------------------------ |
-| `POST` | `/api/auth/register` | Register new user (JSON body)              |
-| `POST` | `/api/auth/login`    | Login with email + password (form-encoded) |
-| `GET`  | `/api/auth/me`       | Get current user profile + analysis count  |
-| `POST` | `/api/auth/logout`   | Client-side logout signal                  |
+| Method | Endpoint                | Description                                |
+| ------ | ----------------------- | ------------------------------------------ |
+| `POST` | `/api/auth/register`    | Register new user (JSON body)              |
+| `POST` | `/api/auth/login`       | Login with email + password (form-encoded) |
+| `GET`  | `/api/auth/me`          | Get current user profile + analysis count  |
+| `PUT`  | `/api/auth/preferences` | Update user-specific settings (JSON)       |
+| `POST` | `/api/auth/logout`      | Client-side logout signal                  |
 
 ---
 
@@ -221,7 +226,8 @@ users
 ├── hashed_password
 ├── is_active
 ├── created_at
-└── last_login
+├── last_login
+└── preferences (JSON)
 
 analyses
 ├── id (PK)
