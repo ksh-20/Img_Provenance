@@ -131,6 +131,13 @@ export const getReport = async (imageId: string): Promise<ForensicsReport> => {
   return data;
 };
 
+export const downloadReportPDF = async (imageId: string): Promise<Blob> => {
+  const { data } = await api.get(`/api/reports/pdf/${imageId}`, {
+    responseType: 'blob',
+  });
+  return data;
+};
+
 export const getDashboardStats = async (): Promise<DashboardStats> => {
   const { data } = await api.get<DashboardStats>('/api/reports/dashboard/stats');
   return data;

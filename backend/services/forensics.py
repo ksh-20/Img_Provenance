@@ -191,3 +191,16 @@ def lsb_steganography_scan(image_path: str) -> Tuple[bool, float, List[str]]:
 
     except Exception:
         return False, random.uniform(0.2, 0.5), []
+def compute_verdict(score: float, n_flags: int, n_regions: int) -> str:
+    """
+    Centralized verdict logic (v1.5 Calibration).
+    Returns: AUTHENTIC | SUSPICIOUS | MANIPULATED | DEEPFAKE
+    """
+    if score >= 0.70:
+        return "DEEPFAKE"
+    elif score >= 0.50 or n_regions >= 6:
+        return "MANIPULATED"
+    elif score >= 0.32 or n_flags >= 3:
+        return "SUSPICIOUS"
+    else:
+        return "AUTHENTIC"

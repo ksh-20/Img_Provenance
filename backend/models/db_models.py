@@ -73,6 +73,7 @@ class ProvenanceRecord(Base):
     integrity_score = Column(Float, default=1.0)
     spread_depth    = Column(Integer, default=0)
     chain_broken    = Column(Boolean, default=False)
+    graph_data      = Column(JSON, nullable=True) # Full D3/ReactFlow JSON
     created_at      = Column(DateTime, default=datetime.utcnow)
 
     user            = relationship("User", back_populates="graphs")
@@ -88,6 +89,7 @@ class SocialRecord(Base):
     viral_coefficient= Column(Float, default=0.0)
     platforms        = Column(JSON, default=list)   # ["Twitter", "Instagram", ...]
     bot_ratio        = Column(Float, default=0.0)
+    spread_data      = Column(JSON, nullable=True) # Full graph/time JSON
     created_at       = Column(DateTime, default=datetime.utcnow)
 
     user             = relationship("User", back_populates="social_spreads")

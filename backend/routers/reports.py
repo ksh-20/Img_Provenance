@@ -1,161 +1,177 @@
-"""
-Reports router — generates comprehensive forensics reports with evidence chains.
-"""
-
-import uuid
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
-from models.schemas import ForensicsReport, DashboardStats
+import uuid
+import os
 
-from routers.analysis import get_analysis_store
+from database import get_db
+from models.db_models import User, AnalysisRecord, ProvenanceRecord, SocialRecord
+from models.schemas import ForensicsReport, DashboardStats
+from services.auth_service import get_current_user
+from services.pdf_generator import generate_forensics_pdf
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
 
-def _compute_verdict(deepfake_score: dict, metadata: dict, manipulation_regions: list) -> str:
-    """
-    Verdict thresholds (v1.1 — calibrated to reduce false positives):
-      DEEPFAKE    score >= 0.72
-      MANIPULATED score >= 0.52  OR  >= 6 high-conf manipulation regions
-      SUSPICIOUS  score >= 0.35  OR  multiple suspicious metadata flags
-      AUTHENTIC   everything else
-
-    NOTE: Missing EXIF alone is NOT enough for SUSPICIOUS — most social-media
-    images have stripped metadata by design.
-    """
-    score   = deepfake_score.get("overall_score", 0)
-    n_flags = len(metadata.get("suspicious_flags", []))
-    n_regions = len(manipulation_regions)
-
-    if score >= 0.70:
-        return "DEEPFAKE"
-    elif score >= 0.50 or n_regions >= 6:
-        return "MANIPULATED"
-    elif score >= 0.32 or n_flags >= 3:
-        return "SUSPICIOUS"
-    else:
-        return "AUTHENTIC"
+from services.forensics import compute_verdict
 
 
-def _build_evidence_summary(data: dict) -> list[str]:
+def _build_evidence_summary(record: AnalysisRecord) -> list[str]:
     evidence = []
-    df = data.get("deepfake_score", {})
-    meta = data.get("metadata", {})
-    regions = data.get("manipulation_regions", [])
-
-    if df.get("overall_score", 0) > 0.45:
-        evidence.append(f"Deepfake confidence score: {df['overall_score']:.2%} — classified as {df.get('confidence_label', 'Unknown')}")
-    if df.get("ela_score", 0) > 0.28:
-        evidence.append(f"Error Level Analysis detected elevated manipulation score: {df['ela_score']:.2%}")
-    if df.get("gan_artifact_score", 0) > 0.35:
-        evidence.append(f"GAN artifact fingerprints detected in frequency domain (score: {df['gan_artifact_score']:.2%})")
-    if df.get("noise_inconsistency", 0) > 0.35:
-        evidence.append("Noise inconsistency across image blocks suggests compositing")
-    if meta.get("steganography_detected"):
-        evidence.append(f"Steganographic content detected (LSB anomaly: {meta.get('lsb_anomaly_score', 0):.2%})")
-    if meta.get("metadata_stripped"):
-        evidence.append("EXIF metadata completely stripped — common in images shared after editing")
-    for flag in meta.get("suspicious_flags", []):
+    if record.deepfake_score > 0.45:
+        evidence.append(f"Deepfake confidence score: {record.deepfake_score:.2%}")
+    if record.ela_score > 0.28:
+        evidence.append(f"Error Level Analysis detected elevated manipulation score: {record.ela_score:.2%}")
+    if record.gan_score > 0.35:
+        evidence.append(f"GAN artifact fingerprints detected in frequency domain (score: {record.gan_score:.2%})")
+    if record.stego_detected:
+        evidence.append("Steganographic content or LSB anomalies detected")
+    
+    flags = record.suspicious_flags or []
+    for flag in flags:
         evidence.append(flag)
-    if regions:
-        evidence.append(f"{len(regions)} suspicious manipulation region(s) identified via ELA")
+        
     if not evidence:
         evidence.append("No significant manipulation indicators detected")
     return evidence
 
 
-def _build_chain_of_custody(data: dict, image_id: str) -> list[dict]:
-    chain = [
-        {"step": 1, "action": "Image Uploaded", "timestamp": data.get("upload_time"), "agent": "FakeLineage System"},
-        {"step": 2, "action": "Perceptual Hashing", "timestamp": data.get("analyzed_at"), "agent": "HashingService"},
-        {"step": 3, "action": "ELA Forensic Analysis", "timestamp": data.get("analyzed_at"), "agent": "ForensicsService"},
-        {"step": 4, "action": "Deepfake Detection Pipeline", "timestamp": data.get("analyzed_at"), "agent": "DeepfakeService"},
-        {"step": 5, "action": "Metadata Extraction & Consistency Check", "timestamp": data.get("analyzed_at"), "agent": "MetadataService"},
-        {"step": 6, "action": "Provenance Graph Construction", "timestamp": data.get("analyzed_at"), "agent": "GraphService"},
-        {"step": 7, "action": "Social Spread Simulation", "timestamp": data.get("analyzed_at"), "agent": "SocialService"},
-        {"step": 8, "action": "Report Generated", "timestamp": datetime.utcnow().isoformat(), "agent": "ReportService"},
-    ]
-    return chain
-
-
 @router.get("/{image_id}", response_model=ForensicsReport)
-async def get_report(image_id: str):
-    store = get_analysis_store()
-    if image_id not in store:
-        raise HTTPException(status_code=404, detail="Image not found")
+async def get_report(
+    image_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    record = db.query(AnalysisRecord).filter(
+        AnalysisRecord.image_id == image_id,
+        AnalysisRecord.user_id == current_user.id
+    ).first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis not found")
 
-    data = store[image_id]
-    if "deepfake_score" not in data:
-        raise HTTPException(status_code=400, detail="Image not yet analyzed. POST /api/images/analyze first.")
+    prov_record = db.query(ProvenanceRecord).filter(ProvenanceRecord.image_id == image_id).first()
+    social_record = db.query(SocialRecord).filter(SocialRecord.image_id == image_id).first()
 
-    report_id = str(uuid.uuid4())
-    deepfake_score = data["deepfake_score"]
-    metadata = data.get("metadata", {})
-    manipulation_regions = data.get("manipulation_regions", [])
-    provenance_graph = data.get("provenance_graph")
-    social_spread = data.get("social_spread")
-
-    if not provenance_graph or not social_spread:
-        raise HTTPException(
-            status_code=400,
-            detail="Complete provenance graph and social spread analysis first."
-        )
-
-    verdict = _compute_verdict(deepfake_score, metadata, manipulation_regions)
-    evidence = _build_evidence_summary(data)
-    custody = _build_chain_of_custody(data, image_id)
-
-    authenticity_score = 1.0 - deepfake_score.get("overall_score", 0.5)
+    verdict = record.verdict or compute_verdict(record.deepfake_score, len(record.suspicious_flags or []), 0)
+    evidence = _build_evidence_summary(record)
+    
+    # Mock custody chain (v1.0)
+    custody = [
+        {"step": 1, "action": "Image Uploaded", "timestamp": record.analyzed_at.isoformat(), "agent": "FakeLineage System"},
+        {"step": 2, "action": "Analysis Completed", "timestamp": record.analyzed_at.isoformat(), "agent": "ForensicsEngine V1.5"}
+    ]
 
     report = ForensicsReport(
-        report_id=report_id,
+        report_id=str(uuid.uuid4()),
         image_id=image_id,
         generated_at=datetime.utcnow().isoformat(),
-        deepfake_analysis=deepfake_score,
-        metadata_analysis=metadata,
-        provenance_graph=provenance_graph,
-        social_spread=social_spread,
-        manipulation_regions=manipulation_regions,
-        overall_authenticity_score=round(authenticity_score, 4),
+        deepfake_analysis={
+            "overall_score": record.deepfake_score,
+            "gan_artifact_score": record.gan_score,
+            "ela_score": record.ela_score,
+            "face_swap_score": record.face_swap_score,
+            "is_deepfake": record.is_deepfake,
+            "confidence_label": "High" if record.is_deepfake else "Low"
+        },
+        metadata_analysis={
+            "format": record.image_format,
+            "width": record.image_width,
+            "height": record.image_height,
+            "has_exif": record.has_exif,
+            "make": record.camera_make,
+            "model": record.camera_model,
+            "steganography_detected": record.stego_detected,
+            "suspicious_flags": record.suspicious_flags
+        },
+        provenance_graph=prov_record.graph_data if prov_record else {"nodes": [], "edges": []},
+        social_spread=social_record.spread_data if social_record else {"nodes": [], "edges": []},
+        manipulation_regions=[], # Not stored in DB to save space
+        overall_authenticity_score=round(1.0 - record.deepfake_score, 4),
         verdict=verdict,
         evidence_summary=evidence,
         chain_of_custody=custody
     )
-
-    store[image_id]["report"] = report.dict()
     return report
 
 
+@router.get("/pdf/{image_id}")
+async def download_pdf_report(
+    image_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate and return a professional PDF forensics report."""
+    report = await get_report(image_id, db, current_user)
+    
+    pdf_dir = "temp_reports"
+    os.makedirs(pdf_dir, exist_ok=True)
+    pdf_path = os.path.join(pdf_dir, f"report_{image_id}.pdf")
+    
+    generate_forensics_pdf(report.dict(), pdf_path)
+    
+    return FileResponse(
+        pdf_path, 
+        media_type="application/pdf", 
+        filename=f"FakeLineage_Report_{image_id}.pdf"
+    )
+
+
 @router.get("/dashboard/stats", response_model=DashboardStats)
-async def get_dashboard_stats():
-    """Dashboard statistics across all analyzed images."""
-    store = get_analysis_store()
-    total = len(store)
-    deepfakes = sum(1 for v in store.values() if v.get("deepfake_score", {}).get("is_deepfake"))
-    suspicious = sum(1 for v in store.values()
-                     if 0.3 <= v.get("deepfake_score", {}).get("overall_score", 0) < 0.5)
-    authentic = sum(1 for v in store.values()
-                    if v.get("deepfake_score", {}).get("overall_score", 0) < 0.3)
+async def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Dashboard statistics from MySQL for the current user."""
+    total = db.query(AnalysisRecord).filter(AnalysisRecord.user_id == current_user.id).count()
+    deepfakes = db.query(AnalysisRecord).filter(
+        AnalysisRecord.user_id == current_user.id,
+        AnalysisRecord.is_deepfake == True
+    ).count()
+    
+    suspicious = db.query(AnalysisRecord).filter(
+        AnalysisRecord.user_id == current_user.id,
+        AnalysisRecord.deepfake_score >= 0.32,
+        AnalysisRecord.deepfake_score < 0.50
+    ).count()
+    
+    authentic = db.query(AnalysisRecord).filter(
+        AnalysisRecord.user_id == current_user.id,
+        AnalysisRecord.deepfake_score < 0.32
+    ).count()
 
-    scores = [v["deepfake_score"]["overall_score"] for v in store.values() if "deepfake_score" in v]
-    avg_integrity = round(1.0 - (sum(scores) / len(scores)) if scores else 0.9, 4)
+    avg_score = db.query(func.avg(AnalysisRecord.deepfake_score)).filter(
+        AnalysisRecord.user_id == current_user.id
+    ).scalar() or 0.1
+    avg_integrity = round(1.0 - float(avg_score), 4)
 
-    recent = sorted(
-        [{"image_id": k, "filename": v.get("filename"), "upload_time": v.get("upload_time"),
-          "verdict": v.get("report", {}).get("verdict", "Pending")}
-         for k, v in store.items()],
-        key=lambda x: x.get("upload_time", ""),
-        reverse=True
-    )[:5]
+    recent_records = db.query(AnalysisRecord).filter(
+        AnalysisRecord.user_id == current_user.id
+    ).order_by(AnalysisRecord.analyzed_at.desc()).limit(5).all()
+
+    recent = [
+        {
+            "image_id": r.image_id,
+            "filename": r.filename,
+            "upload_time": r.analyzed_at.isoformat(),
+            "verdict": r.verdict or "Pending"
+        }
+        for r in recent_records
+    ]
+
+    # Provenance Graph nodes count
+    total_nodes = db.query(func.sum(ProvenanceRecord.node_count)).filter(
+        ProvenanceRecord.user_id == current_user.id
+    ).scalar() or 0
 
     return DashboardStats(
         total_analyses=total,
         deepfakes_detected=deepfakes,
         authentic_images=authentic,
         suspicious_images=suspicious,
-        total_nodes_in_graphs=sum(
-            len(v.get("provenance_graph", {}).get("nodes", [])) for v in store.values()
-        ),
+        total_nodes_in_graphs=int(total_nodes),
         average_integrity_score=avg_integrity,
         platforms_tracked=8,
         recent_analyses=recent

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, RefreshCw } from 'lucide-react';
-import { getReport } from '../api/client';
+import { getReport, downloadReportPDF } from '../api/client';
 import { useAppStore } from '../store/appStore';
 import type { ForensicsReport } from '../types';
 import {
@@ -25,6 +25,23 @@ export default function ForensicsReportPage() {
     } finally { setLoading(false); }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!currentImageId) return;
+    try {
+      const blob = await downloadReportPDF(currentImageId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FakeLineage_Report_${currentImageId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error('PDF download failed', e);
+    }
+  };
+
   const scoreRings = report ? [
     { label: 'Overall Deepfake', value: report.deepfake_analysis.overall_score,           color: '#ef4444' },
     { label: 'GAN Artifacts',    value: report.deepfake_analysis.gan_artifact_score,       color: '#a855f7' },
@@ -43,7 +60,17 @@ export default function ForensicsReportPage() {
           <p className="text-slate-400 text-sm mt-1">Comprehensive chain-of-custody report with evidence summary</p>
         </div>
         <div className="flex gap-3">
-          {report && <JSONExportButton report={report} />}
+          {report && (
+            <>
+              <JSONExportButton report={report} />
+              <button 
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white border border-rose-400/30 hover:bg-white/5 transition-all"
+              >
+                <FileText size={14} /> Export PDF
+              </button>
+            </>
+          )}
           <button onClick={load} disabled={loading}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:scale-105 transition-all disabled:opacity-60"
             style={{ background: 'linear-gradient(135deg, #ef4444, #a855f7)' }}>

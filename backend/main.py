@@ -4,6 +4,7 @@ Image Provenance Graph Construction for Deepfake-Aware Social Media Forensics
 """
 
 import os
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,15 +17,26 @@ from database import engine        # noqa: E402
 from models import db_models       # noqa: E402 (registers all ORM classes)
 db_models.Base.metadata.create_all(bind=engine)
 
+from contextlib import asynccontextmanager
 from routers import analysis, provenance, social, reports
 from routers.auth import router as auth_router
+from services.cleanup import cleanup_task
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start background cleanup task
+    bg_cleanup = asyncio.create_task(cleanup_task())
+    yield
+    # Shutdown: Cancel background cleanup task
+    bg_cleanup.cancel()
 
 app = FastAPI(
     title="FakeLineage API",
     description="Image Provenance Graph Construction for Deepfake-Aware Social Media Forensics",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS for React frontend
