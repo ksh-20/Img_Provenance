@@ -13,6 +13,75 @@ const api = axios.create({
   timeout: 60000,
 });
 
+/* ---- Bearer token injection ---- */
+api.interceptors.request.use((config) => {
+  try {
+    const raw = localStorage.getItem('fakelineage-auth');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const token: string | null = parsed?.state?.token ?? null;
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch { /* ignore */ }
+  return config;
+});
+
+/* ---- Auto-logout on 401 ---- */
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      // Clear persisted auth and redirect to login
+      localStorage.removeItem('fakelineage-auth');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+/* =========================================================
+   Auth API functions
+   ========================================================= */
+
+export interface AuthPayload {
+  access_token: string;
+  token_type: string;
+  user_id: number;
+  username: string;
+  email: string;
+}
+
+export interface RegisterBody {
+  username: string;
+  email: string;
+  password: string;
+}
+
+export const register = async (body: RegisterBody): Promise<AuthPayload> => {
+  const { data } = await api.post<AuthPayload>('/api/auth/register', body);
+  return data;
+};
+
+export const login = async (email: string, password: string): Promise<AuthPayload> => {
+  // OAuth2 form expects application/x-www-form-urlencoded with username field = email
+  const params = new URLSearchParams();
+  params.append('username', email);
+  params.append('password', password);
+  const { data } = await api.post<AuthPayload>('/api/auth/login', params, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+  return data;
+};
+
+export const getMe = async () => {
+  const { data } = await api.get('/api/auth/me');
+  return data;
+};
+
+/* =========================================================
+   Existing API functions (unchanged)
+   ========================================================= */
+
 export const uploadImage = async (file: File): Promise<ImageUploadResponse> => {
   const formData = new FormData();
   formData.append('file', file);

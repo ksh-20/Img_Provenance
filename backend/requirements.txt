@@ -7,7 +7,13 @@ networkx
 numpy
 scipy
 scikit-learn
-pydantic
+pydantic[email]
 aiofiles
 httpx
 python-dotenv
+sqlalchemy
+pymysql
+cryptography
+python-jose[cryptography]
+passlib[bcrypt]
+email-validator

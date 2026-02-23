@@ -1,34 +1,36 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard,
-  ScanLine,
-  GitBranch,
-  Share2,
-  FileText,
-  Layers,
-  Settings,
-  Brain,
-  ChevronLeft,
-  ChevronRight,
-  Activity,
+  LayoutDashboard, ScanLine, GitBranch, Share2,
+  FileText, Layers, Settings, Brain,
+  ChevronLeft, ChevronRight, Activity, LogOut,
 } from 'lucide-react';
-import { useState } from 'react';
 import clsx from 'clsx';
+import { useAuthStore } from '../../store/authStore';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/analysis', label: 'Image Analysis', icon: ScanLine },
+  { path: '/',           label: 'Dashboard',      icon: LayoutDashboard },
+  { path: '/analysis',   label: 'Image Analysis',  icon: ScanLine },
   { path: '/provenance', label: 'Provenance Graph', icon: GitBranch },
-  { path: '/social', label: 'Social Spread', icon: Share2 },
-  { path: '/batch', label: 'Batch Analysis', icon: Layers },
-  { path: '/report', label: 'Forensics Report', icon: FileText },
-  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/social',     label: 'Social Spread',   icon: Share2 },
+  { path: '/batch',      label: 'Batch Analysis',  icon: Layers },
+  { path: '/report',     label: 'Forensics Report',icon: FileText },
+  { path: '/settings',   label: 'Settings',        icon: Settings },
 ];
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
+  const location  = useLocation();
+  const navigate  = useNavigate();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const initials = user?.username?.slice(0, 2).toUpperCase() ?? '??';
 
   return (
     <motion.aside
@@ -52,13 +54,8 @@ export default function Sidebar() {
         </div>
         <AnimatePresence>
           {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
+            <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }} className="overflow-hidden">
               <p className="text-sm font-bold text-white leading-none tracking-wide">FakeLineage</p>
               <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Forensics Platform</p>
             </motion.div>
@@ -86,9 +83,7 @@ export default function Sidebar() {
                 whileHover={{ x: 2 }}
                 className={clsx(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
-                  isActive
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-white'
+                  isActive ? 'text-white' : 'text-slate-400 hover:text-white'
                 )}
                 style={isActive ? {
                   background: 'linear-gradient(135deg, rgba(6,182,212,0.15), rgba(168,85,247,0.1))',
@@ -96,29 +91,17 @@ export default function Sidebar() {
                 } : {}}
               >
                 {isActive && (
-                  <motion.div
-                    layoutId="activeNav"
-                    className="absolute inset-0 rounded-xl"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(6,182,212,0.12), rgba(168,85,247,0.08))',
-                    }}
-                  />
+                  <motion.div layoutId="activeNav" className="absolute inset-0 rounded-xl"
+                    style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.12), rgba(168,85,247,0.08))' }} />
                 )}
-                <Icon
-                  size={18}
-                  className={clsx(
-                    'flex-shrink-0 relative z-10',
-                    isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'
-                  )}
-                />
+                <Icon size={18} className={clsx(
+                  'flex-shrink-0 relative z-10',
+                  isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'
+                )} />
                 <AnimatePresence>
                   {!collapsed && (
-                    <motion.span
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="text-sm font-medium relative z-10 whitespace-nowrap"
-                    >
+                    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="text-sm font-medium relative z-10 whitespace-nowrap">
                       {label}
                     </motion.span>
                   )}
@@ -129,13 +112,43 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="m-3 p-2 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-slate-300"
-      >
-        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-      </button>
+      {/* User profile + logout */}
+      <div className="border-t border-white/5 p-3 space-y-2">
+        <div className={clsx('flex items-center gap-3 px-2 py-2 rounded-xl',
+          collapsed ? 'justify-center' : '')}
+          style={{ background: 'rgba(255,255,255,0.03)' }}>
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+               style={{ background: 'linear-gradient(135deg, #06b6d4, #a855f7)' }}>
+            {initials}
+          </div>
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white truncate">{user?.username ?? 'Guest'}</p>
+                <p className="text-[10px] text-slate-500 truncate">{user?.email ?? ''}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Logout */}
+        <button onClick={handleLogout}
+          className={clsx(
+            'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-all',
+            collapsed ? 'justify-center' : ''
+          )}>
+          <LogOut size={14} className="flex-shrink-0" />
+          {!collapsed && <span>Sign out</span>}
+        </button>
+
+        {/* Collapse toggle */}
+        <button onClick={() => setCollapsed(!collapsed)}
+          className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-white/5 text-slate-500 hover:text-slate-300 transition-all">
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+      </div>
     </motion.aside>
   );
 }
