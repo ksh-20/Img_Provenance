@@ -5,6 +5,7 @@ interface AuthUser {
   user_id: number;
   username: string;
   email: string;
+  preferences?: any;
 }
 
 export interface AuthState {

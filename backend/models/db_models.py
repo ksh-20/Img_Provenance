@@ -17,6 +17,7 @@ class User(Base):
     is_active       = Column(Boolean, default=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     last_login      = Column(DateTime, nullable=True)
+    preferences     = Column(JSON, default=dict)
 
     # relationships
     analyses        = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")

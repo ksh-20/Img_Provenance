@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -45,6 +45,7 @@ class TokenResponse(BaseModel):
     user_id: int
     username: str
     email: str
+    preferences: Dict[str, Any] = {}
 
 
 class UserResponse(BaseModel):
@@ -55,9 +56,13 @@ class UserResponse(BaseModel):
     created_at: datetime
     last_login: Optional[datetime]
     total_analyses: int = 0
+    preferences: Dict[str, Any] = {}
 
     class Config:
         from_attributes = True
+
+class UpdatePreferencesRequest(BaseModel):
+    preferences: Dict[str, Any]
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -84,6 +89,7 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         username=user.username,
         email=user.email,
+        preferences=user.preferences or {},
     )
 
 
@@ -111,6 +117,7 @@ async def login(
         user_id=user.id,
         username=user.username,
         email=user.email,
+        preferences=user.preferences or {},
     )
 
 
@@ -130,7 +137,20 @@ async def get_me(
         created_at=current_user.created_at,
         last_login=current_user.last_login,
         total_analyses=total,
+        preferences=current_user.preferences or {},
     )
+
+
+@router.put("/preferences")
+async def update_preferences(
+    body: UpdatePreferencesRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save user-specific preferences to the database."""
+    current_user.preferences = body.preferences
+    db.commit()
+    return {"status": "success", "preferences": current_user.preferences}
 
 
 @router.post("/logout")

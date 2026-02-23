@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Fingerprint, AlertCircle } from 'lucide-react';
 import { login } from '../api/client';
 import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/settingsStore';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -25,7 +26,11 @@ export default function LoginPage() {
         user_id:  data.user_id,
         username: data.username,
         email:    data.email,
+        preferences: data.preferences
       });
+      if (data.preferences) {
+        useSettingsStore.getState().loadFromBackend(data.preferences);
+      }
       navigate('/');
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? 'Login failed. Check credentials and try again.');

@@ -49,6 +49,7 @@ export interface AuthPayload {
   user_id: number;
   username: string;
   email: string;
+  preferences?: any;
 }
 
 export interface RegisterBody {
