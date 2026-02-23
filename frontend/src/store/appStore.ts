@@ -11,6 +11,7 @@ interface AppState {
   // Current analysis session
   currentImageId: string | null;
   uploadedImage: ImageUploadResponse | null;
+  previewUrl: string | null;  // Shared across pages
   analysisResult: AnalysisResult | null;
   provenanceGraph: ProvenanceGraph | null;
   socialSpread: SocialSpreadGraph | null;
@@ -32,6 +33,7 @@ interface AppState {
   // Setters
   setCurrentImageId: (id: string | null) => void;
   setUploadedImage: (img: ImageUploadResponse | null) => void;
+  setPreviewUrl: (url: string | null) => void;
   setAnalysisResult: (result: AnalysisResult | null) => void;
   setProvenanceGraph: (graph: ProvenanceGraph | null) => void;
   setSocialSpread: (spread: SocialSpreadGraph | null) => void;
@@ -51,6 +53,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   currentImageId: null,
   uploadedImage: null,
+  previewUrl: null,
   analysisResult: null,
   provenanceGraph: null,
   socialSpread: null,
@@ -65,6 +68,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setCurrentImageId: (id) => set({ currentImageId: id }),
   setUploadedImage: (img) => set({ uploadedImage: img }),
+  setPreviewUrl: (url) => set({ previewUrl: url }),
   setAnalysisResult: (result) => set({ analysisResult: result }),
   setProvenanceGraph: (graph) => set({ provenanceGraph: graph }),
   setSocialSpread: (spread) => set({ socialSpread: spread }),
@@ -86,6 +90,7 @@ export const useAppStore = create<AppState>((set) => ({
     set({
       currentImageId: null,
       uploadedImage: null,
+      previewUrl: null,
       analysisResult: null,
       provenanceGraph: null,
       socialSpread: null,

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScanSearch } from 'lucide-react';
 import { uploadImage, analyzeImage } from '../api/client';
@@ -8,29 +8,28 @@ import { VerdictCard, ScoreBreakdown } from '../components/Analysis';
 import { ELAViewer, MetadataPanel } from '../components/Forensics';
 
 export default function AnalysisPage() {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const fileRef = useRef<File | null>(null);
   const {
-    isUploading, isAnalyzing, analysisResult, uploadedImage, error,
+    isUploading, isAnalyzing, analysisResult, uploadedImage, error, previewUrl,
     setIsUploading, setIsAnalyzing, setUploadedImage, setAnalysisResult,
-    setCurrentImageId, setError,
+    setCurrentImageId, setError, setPreviewUrl, resetSession
   } = useAppStore();
 
+  const fileRef = useRef<File | null>(null);
+
   const handleFile = useCallback((file: File) => {
-    setSelectedFile(file);
     fileRef.current = file;
     setPreviewUrl(URL.createObjectURL(file));
     setAnalysisResult(null);
     setError(null);
-  }, [setAnalysisResult, setError]);
+  }, [setAnalysisResult, setError, setPreviewUrl]);
 
   const handleClear = () => {
-    setPreviewUrl(null);
-    setSelectedFile(null);
     fileRef.current = null;
-    setAnalysisResult(null);
-    setError(null);
+    resetSession();
+  };
+
+  const handleReset = () => {
+    handleClear();
   };
 
   const runAnalysis = async () => {
@@ -61,12 +60,24 @@ export default function AnalysisPage() {
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <ScanSearch size={28} className="text-cyan-400" /> Image Analysis
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Upload an image to run deepfake detection, ELA analysis, and metadata forensics
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+              <ScanSearch size={28} className="text-cyan-400" /> Image Analysis
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">
+              Upload an image to run deepfake detection, ELA analysis, and metadata forensics
+            </p>
+          </div>
+          {(analysisResult || previewUrl) && (
+            <button
+              onClick={handleReset}
+              className="px-4 py-2 rounded-xl text-sm font-medium border border-white/10 text-slate-300 hover:bg-white/5 transition-colors"
+            >
+              Start New Analysis
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -119,7 +130,7 @@ export default function AnalysisPage() {
               </>
             )}
 
-            {!analysisResult && !isAnalyzing && !selectedFile && (
+            {!analysisResult && !isAnalyzing && !previewUrl && (
               <motion.div key="placeholder"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 className="glass-card h-96 flex flex-col items-center justify-center text-center p-8">

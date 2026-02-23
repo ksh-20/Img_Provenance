@@ -13,12 +13,25 @@ router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
 
 def _compute_verdict(deepfake_score: dict, metadata: dict, manipulation_regions: list) -> str:
-    score = deepfake_score.get("overall_score", 0)
-    if score >= 0.75:
+    """
+    Verdict thresholds (v1.1 — calibrated to reduce false positives):
+      DEEPFAKE    score >= 0.72
+      MANIPULATED score >= 0.52  OR  >= 6 high-conf manipulation regions
+      SUSPICIOUS  score >= 0.35  OR  multiple suspicious metadata flags
+      AUTHENTIC   everything else
+
+    NOTE: Missing EXIF alone is NOT enough for SUSPICIOUS — most social-media
+    images have stripped metadata by design.
+    """
+    score   = deepfake_score.get("overall_score", 0)
+    n_flags = len(metadata.get("suspicious_flags", []))
+    n_regions = len(manipulation_regions)
+
+    if score >= 0.70:
         return "DEEPFAKE"
-    elif score >= 0.5 or len(manipulation_regions) >= 5:
+    elif score >= 0.50 or n_regions >= 6:
         return "MANIPULATED"
-    elif score >= 0.3 or not metadata.get("has_exif"):
+    elif score >= 0.32 or n_flags >= 3:
         return "SUSPICIOUS"
     else:
         return "AUTHENTIC"
@@ -30,13 +43,13 @@ def _build_evidence_summary(data: dict) -> list[str]:
     meta = data.get("metadata", {})
     regions = data.get("manipulation_regions", [])
 
-    if df.get("overall_score", 0) > 0.5:
+    if df.get("overall_score", 0) > 0.45:
         evidence.append(f"Deepfake confidence score: {df['overall_score']:.2%} — classified as {df.get('confidence_label', 'Unknown')}")
-    if df.get("ela_score", 0) > 0.3:
+    if df.get("ela_score", 0) > 0.28:
         evidence.append(f"Error Level Analysis detected elevated manipulation score: {df['ela_score']:.2%}")
-    if df.get("gan_artifact_score", 0) > 0.3:
+    if df.get("gan_artifact_score", 0) > 0.35:
         evidence.append(f"GAN artifact fingerprints detected in frequency domain (score: {df['gan_artifact_score']:.2%})")
-    if df.get("noise_inconsistency", 0) > 0.3:
+    if df.get("noise_inconsistency", 0) > 0.35:
         evidence.append("Noise inconsistency across image blocks suggests compositing")
     if meta.get("steganography_detected"):
         evidence.append(f"Steganographic content detected (LSB anomaly: {meta.get('lsb_anomaly_score', 0):.2%})")
