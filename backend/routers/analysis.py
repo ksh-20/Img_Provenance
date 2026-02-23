@@ -141,6 +141,7 @@ async def analyze(
 
     return {
         "image_id": image_id,
+        "verdict": record.verdict,
         "deepfake_score": deepfake_score.dict(),
         "ela_map": ela_map,
         "metadata": metadata.dict(),

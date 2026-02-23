@@ -1,8 +1,23 @@
 __pycache__/
 *.pyc
+*__pycache__/
+
 .env
+*.env
+
 venv/
 .venv/
 
+*venv/
+*.venv/
+
 *uploads/
 *temp_reports/
+
+*.vscode/
+
+*node_modules/
+*dist/
+*build/
+*coverage/
+*.log

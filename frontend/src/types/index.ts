@@ -125,6 +125,7 @@ export interface ForensicsReport {
 
 export interface AnalysisResult {
   image_id: string;
+  verdict: 'AUTHENTIC' | 'SUSPICIOUS' | 'MANIPULATED' | 'DEEPFAKE';
   deepfake_score: DeepfakeScore;
   ela_map: number[][];
   metadata: MetadataAnalysis;

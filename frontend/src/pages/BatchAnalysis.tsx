@@ -57,8 +57,7 @@ export default function BatchAnalysisPage() {
         setCurrentImageId(uploaded.image_id);
         const result = await analyzeImage(uploaded.image_id);
         const score = result.deepfake_score.overall_score;
-        const verdict = result.deepfake_score.is_deepfake ? 'DEEPFAKE'
-          : score > 0.3 ? 'SUSPICIOUS' : 'AUTHENTIC';
+        const verdict = result.verdict;
         updateItem(i, { status: 'done', verdict, score });
       } catch (e: any) {
         updateItem(i, { status: 'error', error: e?.response?.data?.detail || 'Failed' });
