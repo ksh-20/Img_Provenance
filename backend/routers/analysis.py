@@ -120,7 +120,7 @@ async def analyze(
     # Update persistence record using shared verdict logic
     record.verdict = compute_verdict(
         deepfake_score.overall_score, 
-        len(metadata.suspicious_flags), 
+        metadata.suspicious_flags, 
         len(manipulation_regions)
     )
     

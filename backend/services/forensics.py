@@ -32,8 +32,8 @@ def perform_ela(image_path: str, quality: int = 90) -> Tuple[List[List[float]], 
         arr = np.array(diff, dtype=np.float32)
 
         # Amplify differences.
-        # Factor 15 (up from 10) increases visibility of subtle edits
-        amplified = np.clip(arr * 15, 0, 255)
+        # Factor 10 increases visibility of subtle edits
+        amplified = np.clip(arr * 10, 0, 255)
 
         # Downsample to manageable heatmap (64x64)
         ela_img = Image.fromarray(amplified.astype(np.uint8)).resize((64, 64), Image.LANCZOS)
@@ -41,8 +41,8 @@ def perform_ela(image_path: str, quality: int = 90) -> Tuple[List[List[float]], 
         ela_normalized = (ela_arr / 255.0).tolist()
 
         ela_score = float(np.mean(ela_arr) / 255.0)
-        # Multiplier 1.6 (v1.5) — stable baseline for noisy & clean images
-        return ela_normalized, min(ela_score * 1.6, 1.0)
+        # Multiplier 1.2 (v1.5) — stable baseline for noisy & clean images
+        return ela_normalized, min(ela_score * 1.2, 1.0)
 
     except Exception:
         # Fallback to noise simulation
@@ -179,9 +179,9 @@ def lsb_steganography_scan(image_path: str) -> Tuple[bool, float, List[str]]:
         avg_score = float(np.mean(scores))
 
         flags = []
-        if avg_score > 0.92:
+        if avg_score > 0.94:
             flags.append("Highly uniform LSB distribution (possible LSB steganography)")
-        if avg_score > 0.85:
+        if avg_score > 0.89:
             flags.append("LSB anomaly detected in color channels")
 
         # Raised threshold: many losslessly-compressed PNGs have near-uniform LSBs
@@ -191,16 +191,20 @@ def lsb_steganography_scan(image_path: str) -> Tuple[bool, float, List[str]]:
 
     except Exception:
         return False, random.uniform(0.2, 0.5), []
-def compute_verdict(score: float, n_flags: int, n_regions: int) -> str:
+def compute_verdict(score: float, flags: List[str], n_regions: int) -> str:
     """
-    Centralized verdict logic (v1.5 Calibration).
+    Centralized verdict logic (v1.9 Calibration).
     Returns: AUTHENTIC | SUSPICIOUS | MANIPULATED | DEEPFAKE
     """
-    if score >= 0.70:
+    # Filter out "noise" flags that frequently appear in legitimate social media images
+    noise_keywords = ["No EXIF", "Camera make", "Camera model", "Modification date", "Thumbnail missing"]
+    n_forensic_flags = len([f for f in flags if not any(k in f for k in noise_keywords)])
+
+    if score >= 0.65:
         return "DEEPFAKE"
-    elif score >= 0.50 or n_regions >= 6:
+    elif score >= 0.45 or n_regions >= 6:
         return "MANIPULATED"
-    elif score >= 0.32 or n_flags >= 3:
+    elif score >= 0.26 or n_forensic_flags >= 3:
         return "SUSPICIOUS"
     else:
         return "AUTHENTIC"
