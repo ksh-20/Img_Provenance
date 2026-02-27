@@ -16,8 +16,8 @@ FakeLineage is a full-stack research platform that traces the origin and spread 
 | 📡 **Social Spread Simulation** | Viral propagation simulation across Twitter, Instagram, TikTok, Reddit |
 | 🔐 **Steganography Scan**       | LSB (Least Significant Bit) anomaly detection for hidden data          |
 | 📋 **Forensics Report**         | Comprehensive report with PDF/JSON export + centralized verdict logic  |
-| 🛡 **JWT Authentication**       | Secure register/login flow with persistent user preferences sync       |
-| 🗄 **MySQL Persistence**        | Analyses, provenance, social spreads, and settings stored per user     |
+| 🛡 **JWT Authentication**        | Secure register/login flow with persistent user preferences sync       |
+| 🗄 **MySQL Persistence**         | Analyses, provenance, social spreads, and settings stored per user     |
 | 📦 **Batch Analysis**           | Queue multiple images for parallel forensic processing                 |
 | 🧹 **Auto-Cleanup**             | Background service that purged temporary files every 30 mins           |
 
